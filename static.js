@@ -2,6 +2,7 @@ var fs = require('fs');
 var qs = require('querystring');
 var path = require('path');
 var contentDisposition = require('content-disposition');
+var mime = require('mime');
 var Then = require('thenjs');
 
 function send(res, status, msg) {
@@ -15,6 +16,7 @@ module.exports = function(dir, opts) {
     if(typeof opts.filecallback !== 'function') {
         opts.filecallback = function(req, res, filePath) {
             res.setHeader('Content-Disposition', contentDisposition(filePath));
+            res.setHeader('Content-Type', mime.lookup(filePath));
             fs.createReadStream(filePath).pipe(res);
         }
     }
