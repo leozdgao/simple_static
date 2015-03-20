@@ -69,7 +69,8 @@ module.exports = function(dir, opts) {
         })
         .fail(function(cont, err) {
 
-            send(res, 500, err.message);
+            if(err.code === 'ENOENT') send(res, 404);
+            else send(res, 500, err.message);
         });
     }
 }
