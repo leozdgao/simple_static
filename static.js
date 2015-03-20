@@ -9,7 +9,42 @@ function send(res, status, msg) {
     res.end(msg && JSON.stringify({ msg: msg }));
 }
 
-module.exports = function(dir) {
+module.exports = function(dir, opts) {
+
+    opts = opts || {};
+    if(typeof opts.filecallback !== 'function') {
+        opts.filecallback = function(req, res, filePath) {
+            res.setHeader('Content-Disposition', contentDisposition(filePath));
+            fs.createReadStream(filePath).pipe(res);
+        }
+    }
+
+    if(typeof opts.dircallback !== 'function') {
+        opts.dircallback = function(req, res, filePath) {
+
+            Then(function(cont) {
+                fs.readdir(filePath, cont);
+            })
+            .then(function(cont, results) {
+                // return dir structure
+                var structure = { dir: [], files: [] }
+                results.forEach(function(file) {
+
+                    var stat = fs.statSync(path.resolve(filePath, file));
+                    var joinedPath = path.join(req.path, file);
+                    if(stat.isDirectory()) {
+                        structure.dir.push(joinedPath);
+                    }
+                    else if(stat.isFile()) {
+                        structure.files.push(joinedPath);
+                    }
+                });
+
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify(structure));
+            });
+        }
+    }
 
     return function(req, res, next) {
 
@@ -24,39 +59,13 @@ module.exports = function(dir) {
             fs.stat(filePath, cont);
         })
         .then(function(cont, stat) {
-            if(stat.isFile()) {
-                // only dir return 400
-                if(onlydir) send(res, 400);
-                // download file
-                else {
-                    res.setHeader('Content-Disposition', contentDisposition(filePath));
-                    fs.createReadStream(filePath).pipe(res);    
-                }
+            if(stat.isFile() && !onlydir) {
+                opts.filecallback.call(null, req, res, filePath);
             }
-            else if(stat.isDirectory()) {
-                // only file will not return dir structure
-                if(onlyfile) send(res, 400);
-                else fs.readdir(filePath, cont);
+            else if(stat.isDirectory() && !onlyfile) {
+                opts.dircallback.call(null, req, res, filePath);
             }
             else send(res, 400);
-        })
-        .then(function(cont, results) {
-            // return dir structure
-            var structure = { dir: [], files: [] }
-            results.forEach(function(file) {
-
-                var stat = fs.statSync(path.resolve(filePath, file));
-                var joinedPath = path.join(req.path, file);
-                if(stat.isDirectory()) {
-                    structure.dir.push(joinedPath);
-                }
-                else if(stat.isFile()) {
-                    structure.files.push(joinedPath);
-                }
-            });
-
-            res.setHeader('Content-Type', 'application/json; charset=utf-8');
-            res.end(JSON.stringify(structure));
         })
         .fail(function(cont, err) {
 
