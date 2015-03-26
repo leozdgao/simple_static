@@ -102,7 +102,13 @@ module.exports = function(dir, opts) {
             onlyfile = (req.query.stat === 'file');
 
         Then(function(cont) {
-            fs.stat(filePath, cont);
+
+            if(!opts.hidden) isHidden(filePath, cont);
+            else cont(null, false);
+        })
+        .then(function(cont, ishidden) {
+            if(ishidden) send(res, 404);
+            else fs.stat(filePath, cont);
         })
         .then(function(cont, stat) {
             if(stat.isFile() && !onlydir) {
