@@ -48,25 +48,24 @@ module.exports = function(dir, opts) {
                     Then.each(results, function(contp, file){
                         var target = path.resolve(filePath, file);
 
-                        if(!opts.hidden) {
-                            Then(function(cont) {
-                                isHidden(target, cont);
-                            })
-                            .then(function(cont, isHidden) {
-                                if(isHidden) contp();
-                                else {
-                                    var stat = fs.statSync(target);
-                                    var joinedPath = path.join(req.path, file);
-                                    if(stat.isDirectory()) {
-                                        structure.dir.push(joinedPath);
-                                    }
-                                    else if(stat.isFile()) {
-                                        structure.files.push(joinedPath);
-                                    }
-                                    contp();
+                        Then(function(cont) {
+                            if(!opts.hidden) isHidden(target, cont);
+                            else cont(null, false);
+                        })
+                        .then(function(cont, isHidden) {
+                            if(isHidden) contp();
+                            else {
+                                var stat = fs.statSync(target);
+                                var joinedPath = path.join(req.path, file);
+                                if(stat.isDirectory()) {
+                                    structure.dir.push(joinedPath);
                                 }
-                            });
-                        }
+                                else if(stat.isFile()) {
+                                    structure.files.push(joinedPath);
+                                }
+                                contp();
+                            }
+                        });
                     })
                     .then(function(cont) {
                         res.setHeader('Content-Type', 'application/json; charset=utf-8');
