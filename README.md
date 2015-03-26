@@ -36,3 +36,11 @@ http://localhost:8000/directory/sub?stat=dir
 ```
 
 Any request that not fit the requirement will response 400 code
+
+Now, it also support glob pattern for cwd, you can use like this:
+
+```shell
+http://localhost:8000/directory/sub?pattern=**.*js
+```
+
+And this request will get the array which contain any files which meet the pattern under `direcotry/sub` folder.

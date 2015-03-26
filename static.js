@@ -3,6 +3,7 @@ var qs = require('querystring');
 var path = require('path');
 var contentDisposition = require('content-disposition');
 var mime = require('mime');
+var glob = require('glob');
 var Then = require('thenjs');
 
 function send(res, status, msg) {
@@ -15,6 +16,7 @@ module.exports = function(dir, opts) {
     opts = opts || {};
     if(typeof opts.filecallback !== 'function') {
         opts.filecallback = function(req, res, filePath) {
+            // download file
             res.setHeader('Content-Disposition', contentDisposition(filePath));
             res.setHeader('Content-Type', mime.lookup(filePath));
             fs.createReadStream(filePath).pipe(res);
@@ -24,27 +26,38 @@ module.exports = function(dir, opts) {
     if(typeof opts.dircallback !== 'function') {
         opts.dircallback = function(req, res, filePath) {
 
-            Then(function(cont) {
-                fs.readdir(filePath, cont);
-            })
-            .then(function(cont, results) {
-                // return dir structure
-                var structure = { dir: [], files: [] }
-                results.forEach(function(file) {
-
-                    var stat = fs.statSync(path.resolve(filePath, file));
-                    var joinedPath = path.join(req.path, file);
-                    if(stat.isDirectory()) {
-                        structure.dir.push(joinedPath);
-                    }
-                    else if(stat.isFile()) {
-                        structure.files.push(joinedPath);
-                    }
+            if(req.query.pattern) {
+                Then(function(cont) {
+                    glob(req.query.pattern, {cwd: filePath}, cont);
+                })
+                .then(function(cont, files) {
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.end(JSON.stringify(files));
                 });
+            }
+            else {
+                Then(function(cont) {
+                    fs.readdir(filePath, cont);
+                })
+                .then(function(cont, results) {
+                    // return dir structure
+                    var structure = { dir: [], files: [] }
+                    results.forEach(function(file) {
 
-                res.setHeader('Content-Type', 'application/json; charset=utf-8');
-                res.end(JSON.stringify(structure));
-            });
+                        var stat = fs.statSync(path.resolve(filePath, file));
+                        var joinedPath = path.join(req.path, file);
+                        if(stat.isDirectory()) {
+                            structure.dir.push(joinedPath);
+                        }
+                        else if(stat.isFile()) {
+                            structure.files.push(joinedPath);
+                        }
+                    });
+
+                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                    res.end(JSON.stringify(structure));
+                });
+            }
         }
     }
 
