@@ -1,9 +1,11 @@
 var fs = require('fs');
+var os = require('os');
 var qs = require('querystring');
 var path = require('path');
 var contentDisposition = require('content-disposition');
 var mime = require('mime');
 var glob = require('glob');
+var fswin = require('fswin');
 var Then = require('thenjs');
 
 function send(res, status, msg) {
@@ -14,6 +16,8 @@ function send(res, status, msg) {
 module.exports = function(dir, opts) {
 
     opts = opts || {};
+    opts.hidden = opts.hidden || false;
+
     if(typeof opts.filecallback !== 'function') {
         opts.filecallback = function(req, res, filePath) {
             // download file
@@ -25,7 +29,6 @@ module.exports = function(dir, opts) {
 
     if(typeof opts.dircallback !== 'function') {
         opts.dircallback = function(req, res, filePath) {
-
             if(req.query.pattern) {
                 Then(function(cont) {
                     glob(req.query.pattern, {cwd: filePath}, cont);
@@ -36,28 +39,56 @@ module.exports = function(dir, opts) {
                 });
             }
             else {
+                var structure = { dir: [], files: [] };
                 Then(function(cont) {
                     fs.readdir(filePath, cont);
                 })
                 .then(function(cont, results) {
                     // return dir structure
-                    var structure = { dir: [], files: [] }
-                    results.forEach(function(file) {
+                    Then.each(results, function(contp, file){
+                        var target = path.resolve(filePath, file);
 
-                        var stat = fs.statSync(path.resolve(filePath, file));
-                        var joinedPath = path.join(req.path, file);
-                        if(stat.isDirectory()) {
-                            structure.dir.push(joinedPath);
+                        if(!opts.hidden) {
+                            Then(function(cont) {
+                                isHidden(target, cont);
+                            })
+                            .then(function(cont, isHidden) {
+                                if(isHidden) contp();
+                                else {
+                                    var stat = fs.statSync(target);
+                                    var joinedPath = path.join(req.path, file);
+                                    if(stat.isDirectory()) {
+                                        structure.dir.push(joinedPath);
+                                    }
+                                    else if(stat.isFile()) {
+                                        structure.files.push(joinedPath);
+                                    }
+                                    contp();
+                                }
+                            });
                         }
-                        else if(stat.isFile()) {
-                            structure.files.push(joinedPath);
-                        }
+                    })
+                    .then(function(cont) {
+                        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                        res.end(JSON.stringify(structure));
                     });
-
-                    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-                    res.end(JSON.stringify(structure));
-                });
+                })
+                
             }
+        }
+    }
+
+    function isHidden(filePath, cb) {
+        var platform = os.platform();
+        if(/^win/.test(platform)) { // if windows
+            fswin.getAttributes(filePath, function(result) {
+                if(result) cb.call(null, null, !!result['IS_HIDDEN']);
+                else cb.call(null, new Error('Path is unaccessible.'));
+            })
+        }
+        else {
+            if(fs.existsSync(filePath)) cb.call(null, null, /^\./.test(filePath));
+            else cb.call(null, new Error('Path is unaccessible.'));
         }
     }
 

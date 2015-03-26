@@ -44,3 +44,5 @@ http://localhost:8000/directory/sub?pattern=**.*js
 ```
 
 And this request will get the array which contain any files which meet the pattern under `direcotry/sub` folder.
+
+Notice the hidden file will not return by default, either file or directory, if you want to return the hidden file or directory, set `hidden` to true in options.
