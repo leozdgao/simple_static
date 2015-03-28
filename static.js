@@ -24,7 +24,7 @@ module.exports = function(dir, opts) {
             res.setHeader('Content-Disposition', contentDisposition(filePath));
             res.setHeader('Content-Type', mime.lookup(filePath));
             fs.createReadStream(filePath).pipe(res);
-        }
+        };
     }
 
     if(typeof opts.dircallback !== 'function') {
